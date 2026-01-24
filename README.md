@@ -79,6 +79,74 @@ Legenda: ✅ zrobione / 🟡 w trakcie / ⬜ do zrobienia
 
 ---
 
+## 🧱 Struktura projektu (pliki i odpowiedzialności)
+
+Poniżej szybka mapa: **gdzie co jest** i **za co odpowiada**.
+
+### 📁 Sceny (`Assets/Scenes/`)
+
+| Plik | Opis |
+|---|---|
+| `MenuScene.unity` | Menu główne (Start / About / Quit) |
+| `GameScene.unity` | Rozgrywka (paletka, piłka, klocki, tło, ściany/kolizje) |
+| `EndGameScene.unity` | Ekran końcowy (Win/Lose + powrót do menu) |
+
+---
+
+### 📁 Skrypty (`Assets/Scripts/`)
+
+| Skrypt | Gdzie używany | Co robi |
+|---|---|---|
+| `Paddle.cs` | GameScene → obiekt `Paddle` | Sterowanie paletką (A/D lub ←/→), ograniczenie ruchu do ścian / colliderów |
+| `BallMove.cs` (lub `Ball.cs`) | GameScene → obiekt `Ball` | Start piłki po czasie, ruch piłki, kierunek startu w stronę paletki, (opcjonalnie) logika przegranej |
+| `MenuUI.cs` | MenuScene → `MenuManager` | Przełączanie widoków UI: Menu ↔ AboutPanel (pokazywanie/ukrywanie) |
+| `SceneLoader.cs` | MenuScene → `MenuManager` | Ładowanie scen: Start → GameScene, Quit, powrót do Menu itd. |
+
+> Jeśli nazwy plików różnią się u Was (np. `BallMove` vs `Ball`), zostaw w README tę nazwę, którą faktycznie macie w projekcie.
+
+---
+
+### 🎨 Grafiki / UI (`Assets/Sprites/`, `Canvas`)
+
+| Element | Gdzie | Opis |
+|---|---|---|
+| `background.png/jpg` | GameScene → obiekt `Background` | Tło gry (wizualne). Do niego można dodać collider’y ścian/sufitu jako osobne childy |
+| `paddle.png` | GameScene → obiekt `Paddle` | Sprite paletki (wizualnie). Collider (BoxCollider2D) odpowiada za odbicie piłki |
+| Canvas (HUD) | GameScene | UI: score/lives/target (jeśli dodane) |
+| Canvas (Menu) | MenuScene | UI: tytuł, przyciski Start/Quit/About + AboutPanel |
+
+---
+
+### 🧩 Najważniejsze obiekty w scenach (co warto wiedzieć)
+
+#### `MenuScene`
+- `Canvas`
+  - `MenuRoot` (Start / About / Quit)
+  - `AboutPanel` (opis gry + autorzy, ukryty domyślnie)
+- `MenuManager` (obiekt z `MenuUI.cs` i `SceneLoader.cs`)
+- `EventSystem` (wymagany do kliknięć UI)
+
+#### `GameScene`
+- `Background` (sprite tła)
+- `Walls` / collidery (ściany + sufit) — najlepiej jako childy `Background`
+- `Paddle` (`Paddle.cs` + BoxCollider2D)
+- `Ball` (`BallMove.cs` + Rigidbody2D + Collider2D)
+- `Bricks` (klocki)
+
+---
+
+## 🔧 Konwencje i szybkie tipy (żeby się nie zgubić)
+
+- UI powinno być na **Canvas** (TextMeshPro / Buttons)
+- Obiekty gry (piłka/paletka/tło/klocki) jako **SpriteRenderer** + collidery
+- Sceny muszą być dodane w **Build Profiles → Scene List**:
+  0. `MenuScene`
+  1. `GameScene`
+  2. `EndGameScene`
+
+
+---
+
 ## 👥 Autorzy
 
 - **Jakub Żurawski**
