@@ -59,9 +59,9 @@ Legenda: ✅ zrobione / 🟡 w trakcie / ⬜ do zrobienia
 | Menu | ✅ | Start / About / Quit | Settings/Credits (opcjonalnie) |
 | About panel | ✅ | panel + tekst | przycisk Back (jeśli trzeba dopracować) |
 | Sceny w Build | ✅ | Menu/Game/End dodane | spiąć logikę Win/Lose z End |
-| Win / Lose | 🟡 | częściowo | WIN: brak klocków, LOSE: piłka spada |
-| HUD | ⬜ | — | Score / Lives / Target |
-| Poziomy | ⬜ | jeden układ | kilka leveli + rosnąca trudność |
+| Win / Lose | ⬜ | częściowo | WIN: brak klocków, LOSE: piłka spada |
+| HUD | ✅ | — | Score / Lives / Target |
+| Poziomy | ✅ | jeden układ | kilka leveli + rosnąca trudność |
 | Pauza | ⬜ | — | PausePanel + Resume/Menu |
 | Audio | ⬜ | — | odbicia / destroy / win / lose |
 | VFX | ⬜ | — | glow / particles / camera shake |
