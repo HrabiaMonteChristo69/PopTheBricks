@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 32fd683865011414dab8c57cb4097e42
+guid: 79ed08d06cff0454692eac15db9e81f2
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 16890799843740477
-    second: Brick_Indestructible_Sprite_0
+      213: -7093311422792036628
+    second: brick_plain_damaged_strong_2_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -37,7 +37,7 @@ TextureImporter:
   maxTextureSize: 2048
   textureSettings:
     serializedVersion: 2
-    filterMode: 0
+    filterMode: 1
     aniso: 1
     mipBias: 0
     wrapU: 1
@@ -53,7 +53,7 @@ TextureImporter:
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
   spriteBorder: {x: 0, y: 0, z: 0, w: 0}
-  spriteGenerateFallbackPhysicsShape: 0
+  spriteGenerateFallbackPhysicsShape: 1
   alphaUsage: 1
   alphaIsTransparency: 1
   spriteTessellationDetail: -1
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Brick_Indestructible_Sprite_0
+      name: brick_plain_damaged_strong_2_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 1057
-        height: 323
+        width: 790
+        height: 292
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: d3b88acc7120c3000800000000000000
-      internalID: 16890799843740477
+      spriteID: cee824bc7de7f8d90800000000000000
+      internalID: -7093311422792036628
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Brick_Indestructible_Sprite_0: 16890799843740477
+      brick_plain_damaged_strong_2_0: -7093311422792036628
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

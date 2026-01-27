@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using TMPro;
 
 public class GameManager : MonoBehaviour
@@ -10,23 +10,25 @@ public class GameManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI livesText;
     [SerializeField] private TextMeshProUGUI targetText;
 
-    [Header("Bricks Root (opcjonalnie)")]
-    [Tooltip("Podaj np. obiekt 'Bricks' z Hierarchy. Jeœli puste, GameManager policzy Bricki w ca³ej scenie.")]
+    [Header("Bricks Root")]
+    [Tooltip("Ustawiane przez LevelManager na aktualny Level.")]
     [SerializeField] private Transform bricksRoot;
 
     [Header("Tuning")]
     [SerializeField] private int pointsPerHit = 10;
     [SerializeField] private int startLives = 3;
 
+    [Header("Level flow")]
+    [SerializeField] private float nextLevelDelay = 1.0f;
+
     // runtime
     public int Score { get; private set; }
     public int Lives { get; private set; }
 
-    /// <summary> Ile ³¹cznie hitów trzeba wykonaæ, ¿eby rozwaliæ wszystkie klocki </summary>
     public int Target { get; private set; }
-
-    /// <summary> Ile hitów zosta³o do koñca </summary>
     public int Left { get; private set; }
+
+    private bool levelFinished;
 
     private void Awake()
     {
@@ -36,18 +38,22 @@ public class GameManager : MonoBehaviour
             return;
         }
         Instance = this;
-
-        // jeœli chcesz, ¿eby GameManager prze¿ywa³ miêdzy scenami, odkomentuj:
-        // DontDestroyOnLoad(gameObject);
     }
 
     private void Start()
     {
         Lives = startLives;
         Score = 0;
+        levelFinished = false;
 
-        RecalculateTarget();
         UpdateHud();
+
+        // JeÅ›li LevelManager nie istnieje (debug), policz target z aktualnego bricksRoot
+        if (LevelManager.Instance == null)
+        {
+            RecalculateTarget();
+            OnLevelStarted(1);
+        }
     }
 
     [ContextMenu("Recalculate Target (Debug)")]
@@ -55,33 +61,36 @@ public class GameManager : MonoBehaviour
     {
         int totalHits = 0;
 
+        Brick[] bricks;
+
+        // NajwaÅ¼niejsze: liczymy tylko bricki z aktywnego levela (bricksRoot ustawiany przez LevelManager)
         if (bricksRoot != null)
-        {
-            // liczymy wszystkie Bricki bêd¹ce dzieæmi BricksRoot
-            var bricks = bricksRoot.GetComponentsInChildren<Brick>(true);
-            foreach (var b in bricks)
-                totalHits += Mathf.Max(1, b.HitsToBreak);
-        }
+            bricks = bricksRoot.GetComponentsInChildren<Brick>(true);
         else
+            bricks = FindObjectsByType<Brick>(FindObjectsSortMode.None);
+
+        foreach (var b in bricks)
         {
-            // fallback: policz wszystkie Bricki w scenie
-            var bricks = FindObjectsByType<Brick>(FindObjectsSortMode.None);
-            foreach (var b in bricks)
-                totalHits += Mathf.Max(1, b.HitsToBreak);
+            if (b == null) continue;
+
+            // âœ… nie liczymy niezniszczalnych
+            if (b.Unbreakable) continue;
+
+            // hitsToBreak: 1..n
+            totalHits += Mathf.Max(1, b.HitsToBreak);
         }
 
         Target = totalHits;
         Left = totalHits;
 
+        levelFinished = false;
         UpdateHud();
     }
 
-    /// <summary>
-    /// Wo³ane przy KA¯DYM trafieniu w klocek (hit = 1).
-    /// Jeœli klocek ma np. 2 ¿ycia, to dostaniesz 2 hity -> 20 pkt i -2 do Left.
-    /// </summary>
     public void RegisterHit(int hits = 1)
     {
+        if (levelFinished) return;
+
         hits = Mathf.Max(1, hits);
 
         Score += pointsPerHit * hits;
@@ -91,20 +100,50 @@ public class GameManager : MonoBehaviour
 
         if (Left == 0 && Target > 0)
         {
-            Debug.Log("WIN! (zniszczono wszystko)");
-            // TODO: WinPanel / przejœcie do EndScene
+            levelFinished = true;
+            Debug.Log("LEVEL CLEAR!");
+            Invoke(nameof(NextLevel), nextLevelDelay);
         }
+    }
+
+    private void NextLevel()
+    {
+        if (LevelManager.Instance != null)
+        {
+            LevelManager.Instance.LoadNextLevel();
+        }
+        else
+        {
+            Debug.LogWarning("Brak LevelManager w scenie!");
+        }
+    }
+
+    // âœ… WoÅ‚ane przez LevelManager po aktywacji levela
+    public void OnLevelStarted(int levelNumber)
+    {
+        // przelicz target (na wypadek gdyby ktoÅ› zapomniaÅ‚)
+        RecalculateTarget();
+
+        // reset piÅ‚ki + pokaz LVL X
+        BallMove ball = FindFirstObjectByType<BallMove>();
+        if (ball != null) ball.StartLevel(levelNumber);
+        else Debug.LogWarning("GameManager: Nie znaleziono BallMove w scenie!");
+
+        UpdateHud();
     }
 
     public void LoseLife()
     {
+        if (levelFinished) return;
+
         Lives = Mathf.Max(0, Lives - 1);
         UpdateHud();
 
         if (Lives <= 0)
         {
+            levelFinished = true;
             Debug.Log("GAME OVER");
-            // TODO: GameOverPanel / przejœcie do EndScene
+            // TODO: panel / restart / menu
         }
     }
 
@@ -113,8 +152,14 @@ public class GameManager : MonoBehaviour
         if (scoreText != null) scoreText.text = $"Score: {Score:0000}";
         if (livesText != null) livesText.text = $"Lives: {Lives}";
 
-        // progress: wykonane / wszystkie
         int done = Mathf.Clamp(Target - Left, 0, Target);
         if (targetText != null) targetText.text = $"Target: {done}/{Target}";
+    }
+
+    public void RefreshHud() => UpdateHud();
+
+    public void SetBricksRoot(Transform newRoot)
+    {
+        bricksRoot = newRoot;
     }
 }

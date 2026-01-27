@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 87492f4b2e6a1f5449d6f7c4a0f0c1fd
+guid: 04d03273691ea51499a2e6391f914244
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -1945334499283872533
-    second: cegla_0
+      213: -1381490136011928770
+    second: brick_plain_damaged_extreme_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -48,7 +48,7 @@ TextureImporter:
   compressionQuality: 50
   spriteMode: 1
   spriteExtrude: 1
-  spriteMeshType: 1
+  spriteMeshType: 0
   alignment: 0
   spritePivot: {x: 0.5, y: 0.5}
   spritePixelsToUnits: 100
@@ -100,7 +100,7 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: cegla_0
+      name: brick_plain_damaged_extreme_0
       rect:
         serializedVersion: 2
         x: 0
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: be45fd86498c005e0800000000000000
-      internalID: -1945334499283872533
+      spriteID: e3b8d4e6a06f3dce0800000000000000
+      internalID: -1381490136011928770
       vertices: []
       indices: 
       edges: []
@@ -135,7 +135,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      cegla_0: -1945334499283872533
+      brick_plain_damaged_extreme_0: -1381490136011928770
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

@@ -1,119 +1,92 @@
-using System.Collections;
 using UnityEngine;
 
-[RequireComponent(typeof(Collider2D))]
-[RequireComponent(typeof(SpriteRenderer))]
 public class Brick : MonoBehaviour
 {
     [Header("Type")]
     [SerializeField] private bool unbreakable = false;
 
-    [Tooltip("Ile razy trzeba trafiæ, ¿eby zniszczyæ (dla unbreakable ignorowane).")]
-    [SerializeField, Min(1)] private int hitsToBreak = 1;
+    [Header("Health")]
+    [Min(1)]
+    [SerializeField] private int hitsToBreak = 1;
 
-    [Header("Visual states (optional)")]
-    [Tooltip("Jeœli ustawisz, sprite bêdzie siê zmienia³ po trafieniach (0 = stan pocz¹tkowy).")]
+    [Header("Visual damage (opcjonalne)")]
+    [Tooltip("Sprite po 1 trafieniu, po 2 trafieniu, itd. (dla Brick_3 ustaw 2 sprity).")]
     [SerializeField] private Sprite[] damageSprites;
 
-    [Tooltip("Jeœli nie u¿ywasz sprite'ów, mo¿esz ustawiæ kolory stanów (0 = stan pocz¹tkowy).")]
-    [SerializeField] private Color[] damageColors;
-
-    [Header("Hit feedback")]
-    [SerializeField] private float flashTime = 0.06f;
-    [SerializeField] private Color flashColor = Color.white;
-
-    [SerializeField] private float punchScale = 0.08f;
-    [SerializeField] private float punchTime = 0.08f;
-
-    private int hitsLeft;
+    private int hp;
     private SpriteRenderer sr;
-    private Color baseColor;
-    private Vector3 baseScale;
+    private Sprite baseSprite;
 
-    // Dla GameManagera: target ma liczyæ tylko niszczalne
-    public int HitsToBreak => unbreakable ? 0 : Mathf.Max(1, hitsToBreak);
+    public bool Unbreakable => unbreakable;
+
+    // Dla unbreakable: 0 (¿eby GameManager móg³ to pomin¹æ w target)
+    public int HitsToBreak => Unbreakable ? 0 : Mathf.Max(1, hitsToBreak);
 
     private void Awake()
     {
         sr = GetComponent<SpriteRenderer>();
-        baseColor = sr.color;
-        baseScale = transform.localScale;
+        baseSprite = sr != null ? sr.sprite : null;
 
-        hitsLeft = unbreakable ? int.MaxValue : Mathf.Max(1, hitsToBreak);
-        ApplyDamageVisual();
+        ResetState();
+    }
+
+    private void OnEnable()
+    {
+        // wa¿ne przy levelach (w³¹cz/wy³¹cz)
+        if (sr == null) sr = GetComponent<SpriteRenderer>();
+        if (baseSprite == null && sr != null) baseSprite = sr.sprite;
+
+        ResetState();
+    }
+
+    private void ResetState()
+    {
+        if (Unbreakable)
+        {
+            hp = int.MaxValue;
+        }
+        else
+        {
+            hp = Mathf.Max(1, hitsToBreak);
+        }
+
+        if (sr != null && baseSprite != null)
+            sr.sprite = baseSprite;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // Upewnij siê, ¿e pi³ka ma tag "Ball"
-        if (!collision.collider.CompareTag("Ball"))
-            return;
+        // opcjonalnie: ogranicz do pi³ki (polecam)
+        if (!collision.collider.CompareTag("Ball")) return;
 
-        if (unbreakable)
-        {
-            StartCoroutine(HitFeedback());
-            return;
-        }
+        if (Unbreakable) return;
 
-        hitsLeft--;
+        // klocek dostaje dmg
+        hp--;
 
-        // ka¿dy hit = 10 pkt i 1 do Target/Left
-        GameManager.Instance?.RegisterHit(1);
+        // 1 hit = 10 pkt + -1 do targetu
+        if (GameManager.Instance != null)
+            GameManager.Instance.RegisterHit(1);
 
-        if (hitsLeft <= 0)
+        if (hp <= 0)
         {
             Destroy(gameObject);
             return;
         }
 
-        ApplyDamageVisual();
-        StartCoroutine(HitFeedback());
+        UpdateVisual();
     }
 
-    private void ApplyDamageVisual()
+    private void UpdateVisual()
     {
-        if (unbreakable) return;
+        if (sr == null) return;
 
-        int damageIndex = Mathf.Clamp(hitsToBreak - hitsLeft, 0,
-            Mathf.Max(0, Mathf.Max(damageSprites.Length, damageColors.Length) - 1));
+        int hitsTaken = hitsToBreak - hp; // po 1 trafieniu = 1
+        int idx = hitsTaken - 1;
 
-        // Sprites maj¹ pierwszeñstwo
-        if (damageSprites != null && damageSprites.Length > 0)
-        {
-            int idx = Mathf.Clamp(damageIndex, 0, damageSprites.Length - 1);
+        if (damageSprites != null && idx >= 0 && idx < damageSprites.Length && damageSprites[idx] != null)
             sr.sprite = damageSprites[idx];
-            baseColor = sr.color; // nie zmieniamy koloru, tylko sprite
-        }
-        else if (damageColors != null && damageColors.Length > 0)
-        {
-            int idx = Mathf.Clamp(damageIndex, 0, damageColors.Length - 1);
-            sr.color = damageColors[idx];
-            baseColor = sr.color;
-        }
-    }
-
-    private IEnumerator HitFeedback()
-    {
-        // Flash
-        Color prev = sr.color;
-        sr.color = flashColor;
-
-        // Punch scale
-        Vector3 punch = baseScale * (1f + punchScale);
-        transform.localScale = punch;
-
-        yield return new WaitForSeconds(flashTime);
-
-        sr.color = prev;
-
-        // szybki powrót skali
-        float t = 0f;
-        while (t < punchTime)
-        {
-            t += Time.deltaTime;
-            transform.localScale = Vector3.Lerp(transform.localScale, baseScale, t / punchTime);
-            yield return null;
-        }
-        transform.localScale = baseScale;
+        else
+            sr.sprite = baseSprite; // fallback
     }
 }
