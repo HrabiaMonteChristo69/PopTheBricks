@@ -24,10 +24,14 @@ public class LevelManager : MonoBehaviour
             return;
         }
 
-        // Pobierz dzieci LevelsRoot jako levele
         int n = levelsRoot.childCount;
-        levels = new GameObject[n];
+        if (n <= 0)
+        {
+            Debug.LogError("LevelManager: levelsRoot nie ma dzieci (leveli)!");
+            return;
+        }
 
+        levels = new GameObject[n];
         for (int i = 0; i < n; i++)
             levels[i] = levelsRoot.GetChild(i).gameObject;
 
@@ -40,9 +44,7 @@ public class LevelManager : MonoBehaviour
         ActivateLevel(current);
     }
 
-    /// <summary>
-    /// Czy istnieje kolejny level (dla GameManagera / UI "win" per level).
-    /// </summary>
+    /// <summary>Czy istnieje kolejny level.</summary>
     public bool HasNextLevel()
     {
         if (levels == null) return false;
@@ -54,16 +56,19 @@ public class LevelManager : MonoBehaviour
         if (levels == null || levels.Length == 0) return;
 
         // Wyłącz aktualny
-        levels[current].SetActive(false);
+        if (current >= 0 && current < levels.Length)
+            levels[current].SetActive(false);
 
         current++;
+
+        // Koniec gry (brak kolejnych leveli)
         if (current >= levels.Length)
         {
             Debug.Log("KONIEC GRY / BRAK KOLEJNYCH LEVELI");
+            if (GameManager.Instance != null) GameManager.Instance.FinishGameWin();
             return;
         }
 
-        // Włącz następny
         ActivateLevel(current);
     }
 
@@ -73,12 +78,10 @@ public class LevelManager : MonoBehaviour
 
         levels[index].SetActive(true);
 
-        // Ustaw root bricków na aktualny level
         if (GameManager.Instance != null)
         {
             GameManager.Instance.SetBricksRoot(levels[index].transform);
-            GameManager.Instance.RecalculateTarget();
-            GameManager.Instance.OnLevelStarted(index + 1); // ✅ pokazuje napis LVL X + reset piłki
+            GameManager.Instance.OnLevelStarted(index + 1); // ✅ LVL X + reset piłki + target
         }
         else
         {

@@ -23,16 +23,16 @@ public class GameManager : MonoBehaviour
     [Header("Level flow")]
     [SerializeField] private float nextLevelDelay = 1.0f;
 
+    [Header("Scenes")]
+    [SerializeField] private string endSceneName = "EndGameScene";
+
     // runtime
     public int Score { get; private set; }
     public int Lives { get; private set; }
-
     public int Target { get; private set; }
     public int Left { get; private set; }
 
     private bool levelFinished;
-
-    // TECH (Sprint 3): zabezpieczenie przed podwójnym wywołaniem end-flow
     private Coroutine endFlowRoutine;
 
     private void Awake()
@@ -47,22 +47,26 @@ public class GameManager : MonoBehaviour
 
     private void Start()
     {
+        // na wszelki wypadek (pauza/freeze/itp.)
+        Time.timeScale = 1f;
+
         Lives = startLives;
         Score = 0;
         levelFinished = false;
 
         UpdateHud();
 
-        // Jeśli LevelManager nie istnieje (debug), policz target z aktualnego bricksRoot
+        // Debug fallback (gdyby LevelManager nie istniał)
         if (LevelManager.Instance == null)
         {
             RecalculateTarget();
             OnLevelStarted(1);
         }
+    }
 
-        // TECH: upewniamy się, że UI istnieje (jeśli skrypt jest w scenie)
-        // Jeśli nie ma — nic się nie stanie (fallback na Debug.Log).
-        _ = EndGameUI.Instance;
+    private int GetCurrentLevelNumberSafe()
+    {
+        return LevelManager.Instance != null ? LevelManager.Instance.CurrentLevelNumber : 1;
     }
 
     [ContextMenu("Recalculate Target (Debug)")]
@@ -70,22 +74,15 @@ public class GameManager : MonoBehaviour
     {
         int totalHits = 0;
 
-        Brick[] bricks;
-
-        // Najważniejsze: liczymy tylko bricki z aktywnego levela (bricksRoot ustawiany przez LevelManager)
-        if (bricksRoot != null)
-            bricks = bricksRoot.GetComponentsInChildren<Brick>(true);
-        else
-            bricks = FindObjectsByType<Brick>(FindObjectsSortMode.None);
+        Brick[] bricks = (bricksRoot != null)
+            ? bricksRoot.GetComponentsInChildren<Brick>(true)
+            : FindObjectsByType<Brick>(FindObjectsSortMode.None);
 
         foreach (var b in bricks)
         {
             if (b == null) continue;
+            if (b.Unbreakable) continue; // nie liczymy niezniszczalnych
 
-            // ✅ nie liczymy niezniszczalnych
-            if (b.Unbreakable) continue;
-
-            // hitsToBreak: 1..n
             totalHits += Mathf.Max(1, b.HitsToBreak);
         }
 
@@ -94,6 +91,15 @@ public class GameManager : MonoBehaviour
 
         levelFinished = false;
         UpdateHud();
+
+        // Jeśli level ma 0 rozwalalnych bricków -> potraktuj jako "od razu wyczyszczony"
+        if (Target == 0)
+        {
+            levelFinished = true;
+
+            if (endFlowRoutine != null) StopCoroutine(endFlowRoutine);
+            endFlowRoutine = StartCoroutine(LevelClearFlow(GetCurrentLevelNumberSafe()));
+        }
     }
 
     public void RegisterHit(int hits = 1)
@@ -111,67 +117,44 @@ public class GameManager : MonoBehaviour
         {
             levelFinished = true;
 
-            // TECH (Sprint 1 – Kamera): victory feedback
-            if (CameraController.Instance != null)
-            {
-                CameraController.Instance.PunchZoom(0.18f);
-                CameraController.Instance.ShakeMedium();
-            }
+            int levelNumber = GetCurrentLevelNumberSafe();
 
-            Debug.Log("LEVEL CLEAR!");
+            // ✅ Overlay FX (konfetti/flash/napis) w GameScene – jeśli obiekt istnieje
+            if (EndGameOverlayFX.Instance != null)
+                EndGameOverlayFX.Instance.ShowLevelClear(levelNumber);
 
             if (endFlowRoutine != null) StopCoroutine(endFlowRoutine);
-            endFlowRoutine = StartCoroutine(LevelClearFlow());
+            endFlowRoutine = StartCoroutine(LevelClearFlow(levelNumber));
         }
     }
 
-    private IEnumerator LevelClearFlow()
+    private IEnumerator LevelClearFlow(int clearedLevelNumber)
     {
-        int levelNumber = LevelManager.Instance != null ? LevelManager.Instance.CurrentLevelNumber : 1;
-
-        // UI (Sprint 3): "YOU WIN" na chwilę po każdym levelu
-        if (EndGameUI.Instance != null) EndGameUI.Instance.ShowLevelClear(levelNumber);
-
-        // krótka pauza dla prowadzącego (łatwo pokazać)
+        // mała pauza zanim wczytamy następny level / EndScene
         yield return new WaitForSeconds(nextLevelDelay);
 
-        // jeśli są kolejne levele -> gramy dalej
         if (LevelManager.Instance != null && LevelManager.Instance.HasNextLevel())
         {
             LevelManager.Instance.LoadNextLevel();
+            // LevelManager po aktywacji levela wywoła: GameManager.OnLevelStarted(...)
         }
         else
         {
-            // jeśli brak kolejnego levela, to możesz:
-            // A) wrócić do menu
-            // B) wejść na EndGameScene
-            // My robimy EndGameScene, bo masz ją w projekcie (lepsze demo).
-            Debug.Log("BRAK KOLEJNEGO LEVELA -> END SCENE");
-
-            // delikatny "final" feedback
-            if (CameraController.Instance != null)
-            {
-                CameraController.Instance.ShakeSmall();
-                CameraController.Instance.PunchZoom(0.10f);
-            }
-
-            SceneManager.LoadScene("EndGameScene");
+            FinishGameWin();
         }
 
         endFlowRoutine = null;
     }
 
-    // ✅ Wołane przez LevelManager po aktywacji levela
+    // wołane przez LevelManager po aktywacji levela
     public void OnLevelStarted(int levelNumber)
     {
-        // przelicz target (na wypadek gdyby ktoś zapomniał)
         RecalculateTarget();
 
-        // reset piłki + pokaz LVL X
         BallMove ball = FindFirstObjectByType<BallMove>();
         if (ball != null) ball.StartLevel(levelNumber);
-        else Debug.LogWarning("GameManager: Nie znaleziono BallMove w scenie!");
 
+        levelFinished = false;
         UpdateHud();
     }
 
@@ -185,7 +168,10 @@ public class GameManager : MonoBehaviour
         if (Lives <= 0)
         {
             levelFinished = true;
-            Debug.Log("GAME OVER");
+
+            // ✅ Overlay FX (GAME OVER) w GameScene – jeśli obiekt istnieje
+            if (EndGameOverlayFX.Instance != null)
+                EndGameOverlayFX.Instance.ShowGameOver();
 
             if (endFlowRoutine != null) StopCoroutine(endFlowRoutine);
             endFlowRoutine = StartCoroutine(GameOverFlow());
@@ -194,28 +180,32 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator GameOverFlow()
     {
-        // UI
-        if (EndGameUI.Instance != null) EndGameUI.Instance.ShowGameOver();
+        // krótka chwila na pokazanie napisu/flash (i ewentualny freeze z overlay)
+        yield return new WaitForSeconds(0.35f);
 
-        // TECH: shake ma trwać parę sekund po przegranej (dla efektu)
-        float shakeTime = 2.2f;
-        float t = 0f;
-
-        while (t < shakeTime)
-        {
-            t += Time.deltaTime;
-
-            // delikatne „podtrzymanie” shake, ale bez przesady
-            if (CameraController.Instance != null) CameraController.Instance.AddShake(0.06f);
-
-            yield return null;
-        }
-
-        // po shake -> menu (MenuScene)
-        SceneManager.LoadScene("MenuScene");
-
+        FinishGameLose();
         endFlowRoutine = null;
     }
+
+    // ===================== END GAME =====================
+
+    public void FinishGameWin()
+    {
+        EndGameData.Won = true;
+        EndGameData.Score = Score;
+
+        SceneManager.LoadScene(endSceneName, LoadSceneMode.Single);
+    }
+
+    public void FinishGameLose()
+    {
+        EndGameData.Won = false;
+        EndGameData.Score = Score;
+
+        SceneManager.LoadScene(endSceneName, LoadSceneMode.Single);
+    }
+
+    // ===================== HUD =====================
 
     private void UpdateHud()
     {
@@ -233,4 +223,3 @@ public class GameManager : MonoBehaviour
         bricksRoot = newRoot;
     }
 }
-

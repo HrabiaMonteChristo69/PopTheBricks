@@ -29,6 +29,13 @@ public class BallMove : MonoBehaviour
     [SerializeField] private float minYAbs = 0.25f;       // minimalna "pionowość" kierunku
     [SerializeField] private float nudgeStrength = 0.06f; // delikatny kopniak (opcjonalnie)
 
+    [Header("SFX (brick hit)")]
+    [SerializeField] private AudioSource sfxSource;       // AudioSource na piłce (lub child)
+    [SerializeField] private AudioClip brickHitClip;      // tutaj wrzuć brick_hit.wav
+    [Range(0f, 1f)]
+    [SerializeField] private float brickHitVolume = 0.8f;
+    [SerializeField] private Vector2 pitchRange = new Vector2(0.95f, 1.05f);
+
     private Rigidbody2D rb;
 
     private float timer;
@@ -42,14 +49,12 @@ public class BallMove : MonoBehaviour
     private bool showingLevelBanner = false;
     private float levelBannerTimer = 0f;
 
-    // TECH (Sprint 2 – Fire Mode): opcjonalny komponent na piłce.
+    // opcjonalny komponent na piłce
     private FireModeOnBall fireMode;
 
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-
-        // TECH: cache FireMode (jeśli dodasz komponent)
         fireMode = GetComponent<FireModeOnBall>();
 
         if (paddle == null)
@@ -57,6 +62,9 @@ public class BallMove : MonoBehaviour
             GameObject p = GameObject.FindGameObjectWithTag("Paddle");
             if (p != null) paddle = p.transform;
         }
+
+        // auto AudioSource jeśli nie przypięty
+        if (sfxSource == null) sfxSource = GetComponent<AudioSource>();
 
         var col = GetComponent<Collider2D>();
         if (col != null) ballHalfHeight = col.bounds.extents.y;
@@ -70,7 +78,6 @@ public class BallMove : MonoBehaviour
 
     void Start()
     {
-        // Start gry = Level 1 (jeśli LevelManager wywoła StartLevel, to i tak nadpisze)
         StartLevel(1);
     }
 
@@ -78,12 +85,10 @@ public class BallMove : MonoBehaviour
     {
         if (paddle == null) return;
 
-        // Przed startem: piłka przyklejona do paletki
         if (!launched)
         {
             SnapToPaddle();
 
-            // 1) Najpierw pokazujemy napis LVL X
             if (showingLevelBanner)
             {
                 levelBannerTimer -= Time.deltaTime;
@@ -92,10 +97,9 @@ public class BallMove : MonoBehaviour
                     showingLevelBanner = false;
                     if (countdownText != null) countdownText.text = "";
                 }
-                return; // nie schodzimy jeszcze z timera
+                return;
             }
 
-            // 2) Potem normalne odliczanie
             timer -= Time.deltaTime;
 
             if (countdownText != null && !showingStart)
@@ -118,7 +122,6 @@ public class BallMove : MonoBehaviour
             }
         }
 
-        // Przegrana gdy piłka spadnie poniżej paletki
         float loseLineY = paddle.position.y - paddleHalfHeight - ballHalfHeight - loseMargin;
         if (!losingNow && transform.position.y < loseLineY)
         {
@@ -129,30 +132,19 @@ public class BallMove : MonoBehaviour
 
     private void OnBallLost()
     {
-        // TECH (Sprint 2 – Fire Mode):
-        // Strata życia = reset combo (żeby „6 hitów” wymagało utrzymania piłki).
         if (fireMode != null) fireMode.ResetCombo();
 
-        // TECH (Sprint 1 – Kamera): strata życia = najmocniejszy feedback.
-        // Kamera trzęsie się mocniej, żeby gracz czuł "porażkę" i wagę błędu.
         if (CameraController.Instance != null)
-        {
             CameraController.Instance.ShakeBig();
-        }
 
         if (GameManager.Instance != null)
         {
             GameManager.Instance.LoseLife();
 
             if (GameManager.Instance.Lives > 0)
-            {
-                // po stracie życia wracamy do paletki i odliczamy od nowa
                 ResetToPaddle();
-            }
             else
-            {
                 rb.linearVelocity = Vector2.zero;
-            }
         }
         else
         {
@@ -176,8 +168,6 @@ public class BallMove : MonoBehaviour
     public void ResetToPaddle()
     {
         CancelInvoke();
-
-        // TECH (Sprint 2 – Fire Mode): reset combo na każdym resecie do paletki.
         if (fireMode != null) fireMode.ResetCombo();
 
         launched = false;
@@ -205,13 +195,28 @@ public class BallMove : MonoBehaviour
 
     void LaunchBall()
     {
-        // START prosto do góry
-        Vector2 direction = Vector2.up;
-        rb.linearVelocity = direction * speed;
+        rb.linearVelocity = Vector2.up * speed;
+    }
+
+    private void PlayBrickHitSfx()
+    {
+        if (sfxSource == null || brickHitClip == null) return;
+
+        float pitch = Random.Range(pitchRange.x, pitchRange.y);
+        sfxSource.pitch = pitch;
+        sfxSource.PlayOneShot(brickHitClip, brickHitVolume);
+        sfxSource.pitch = 1f;
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
+        // SFX tylko dla bricków
+        Brick hitBrick = collision.collider.GetComponentInParent<Brick>();
+        if (hitBrick != null)
+        {
+            PlayBrickHitSfx();
+        }
+
         // Odbicie od paletki
         if (collision.collider.CompareTag("Paddle"))
         {
@@ -231,7 +236,6 @@ public class BallMove : MonoBehaviour
         Vector2 dir2 = rb.linearVelocity.normalized;
         if (dir2.sqrMagnitude < 0.0001f) dir2 = Vector2.up;
 
-        // Anti-stuck: jeżeli leci prawie poziomo, wymuś minimalne |Y|
         if (Mathf.Abs(dir2.y) < minYAbs)
         {
             float signY = (dir2.y >= 0f) ? 1f : -1f;
@@ -240,7 +244,6 @@ public class BallMove : MonoBehaviour
             float signX = (dir2.x >= 0f) ? 1f : -1f;
             dir2.x = signX * Mathf.Sqrt(Mathf.Max(0f, 1f - dir2.y * dir2.y));
 
-            // opcjonalny mini “kop” żeby nie wpadało w identyczne odbicia
             dir2.x += Random.Range(-nudgeStrength, nudgeStrength);
             dir2 = dir2.normalized;
         }
